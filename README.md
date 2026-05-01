@@ -1,50 +1,84 @@
 # devtool-cli
 
-A production-quality, modular CLI developer tool built in Go using [Cobra](https://github.com/spf13/cobra).
+> A production-quality developer productivity tool built in Go with modular architecture, powered by [Cobra](https://github.com/spf13/cobra).
 
-Automate common developer tasks — fetch APIs, format JSON files, and organize messy folders — all from your terminal.
+Automate common developer tasks — fetch APIs, format JSON, and organize messy folders — all from your terminal with colored output, rich error handling, and debug mode.
 
 ---
 
-## Features
+## ✨ Features
 
 | Command | Description |
 |---|---|
-| `devtool get <url>` | Fetch API data and display the response |
-| `devtool format <file.json>` | Pretty-print a JSON file |
-| `devtool clean <folder>` | Organize files into categorized subfolders |
+| `devtool get <url>` | Fetch API data with status codes, response time, and optional save-to-file |
+| `devtool format <file>` | Validate and pretty-print JSON files with save support |
+| `devtool clean <folder>` | Organize files into categorized subfolders with a detailed summary |
+| `devtool version` | Display version, commit, and build info |
 
 ### Flags
 
 | Flag | Scope | Description |
 |---|---|---|
 | `--save`, `-s` | `get`, `format` | Save output to a file instead of printing to terminal |
-| `--verbose`, `-v` | Global | Enable debug logging for all commands |
+| `--verbose`, `-v` | Global | Enable debug logging (response headers, file paths, etc.) |
 
 ---
 
-## Project Structure
+## 🛡️ Error Handling
+
+This tool handles real-world edge cases gracefully:
+
+```bash
+# Invalid URL
+$ devtool get not-a-url
+✖ URL must include scheme and host (e.g., https://example.com), got: not-a-url
+
+# Missing file
+$ devtool format missing.json
+✖ file not found: 'missing.json'
+
+# Wrong file type
+$ devtool format README.md
+✖ expected a .json file, got '.md'
+
+# Non-existent folder
+$ devtool clean fakefolder
+✖ directory not found: 'fakefolder'
+
+# DNS failure
+$ devtool get https://doesnotexist.invalid
+✖ DNS resolution failed — host not found
+
+# Request timeout (10s limit)
+$ devtool get https://slow-server.example.com
+✖ request timed out after 10s
+```
+
+---
+
+## 📁 Project Structure
 
 ```
 devtool-cli/
-├── main.go                  # Entry point
-├── cmd/                     # Cobra command handlers
-│   ├── root.go              # Base CLI setup & global flags
-│   ├── get.go               # HTTP fetch command
-│   ├── format.go            # JSON formatter command
-│   └── clean.go             # File organizer command
-├── internal/utils/          # Reusable helper functions
-│   ├── http.go              # HTTP client utility
-│   ├── json.go              # JSON formatting utility
-│   ├── file.go              # File organization utility
-│   └── logger.go            # Colored terminal output
+├── main.go                      # Minimal entry point
+├── cmd/                         # Cobra command handlers
+│   ├── root.go                  # Base CLI + global --verbose flag
+│   ├── get.go                   # HTTP fetch command
+│   ├── format.go                # JSON formatter command
+│   ├── clean.go                 # File organizer command
+│   └── version.go               # Version info command
+├── internal/utils/              # Private, reusable helper functions
+│   ├── http.go                  # HTTP client (timeout, validation, structured response)
+│   ├── json.go                  # JSON parser (validation, formatting)
+│   ├── file.go                  # File organizer (categorization, move summary)
+│   └── logger.go                # Colored terminal output (ANSI)
 ├── go.mod
 └── go.sum
 ```
 
 ---
 
-## Installation
+## 🚀 Installation
 
 ### Prerequisites
 
@@ -53,76 +87,91 @@ devtool-cli/
 ### Build from source
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/devtool-cli.git
-cd devtool-cli
+git clone https://github.com/GhanshyamJha05/Devtool-cli.git
+cd Devtool-cli
 go build -o devtool .
 ```
 
-The binary `devtool` (or `devtool.exe` on Windows) will be created in the project root.
-
 ---
 
-## Usage
+## 📖 Usage
 
-### Fetch API data
+### Fetch API Data
 
 ```bash
-# Print response to terminal
+# Print response to terminal (with status code & response time)
 devtool get https://jsonplaceholder.typicode.com/posts/1
 
 # Save response to a file
-devtool get https://jsonplaceholder.typicode.com/posts/1 --save output.json
+devtool get https://api.github.com/users/octocat --save user.json
+
+# Debug mode — see headers, content-type, content-length
+devtool get https://httpbin.org/get --verbose
 ```
 
 ### Format JSON
 
 ```bash
 # Pretty-print a JSON file
-devtool format data.json
+devtool format config.json
 
 # Save formatted output to a new file
 devtool format data.json --save pretty.json
 ```
 
-### Clean / Organize a folder
+### Clean / Organize a Folder
 
 ```bash
-# Organize files in ~/Downloads by type
-devtool clean ~/Downloads
+# Organize files by type (Images, Documents, Code, Videos, etc.)
+devtool clean ./downloads
 ```
 
-Files are moved into subfolders like `Images/`, `Documents/`, `Code/`, `Videos/`, `Audio/`, `Archives/`, and `Others/`.
+Output:
+```
+ℹ Scanning folder: ./downloads...
 
-### Debug mode
+✔ Images       → 5 file(s)
+✔ Documents    → 3 file(s)
+✔ Code         → 8 file(s)
+✔ Archives     → 2 file(s)
+⚠ Skipped 1 file(s) with no extension
 
-Add `--verbose` (or `-v`) to any command to see debug output:
+✔ Done! Organized 18 file(s) into 4 categories
+```
+
+### Version
 
 ```bash
-devtool get https://api.example.com/data --verbose
+devtool version
+# devtool-cli v1.0.0
+#   commit : abc1234
+#   built  : 2026-05-01
 ```
 
 ---
 
-## Tech Stack
+## 🏗️ Tech Stack
 
 - **Language:** Go (Golang)
 - **CLI Framework:** [Cobra](https://github.com/spf13/cobra)
-- **Architecture:** Clean, modular — commands and utilities are fully separated
-- **Dependencies:** Only Cobra + pflag (zero bloat)
+- **Architecture:** Clean, modular — `cmd/` for commands, `internal/utils/` for business logic
+- **Error Handling:** URL validation, file checks, timeouts, DNS errors, empty files
+- **Output:** Colored terminal output using ANSI codes (zero dependencies)
+- **Dependencies:** Only Cobra + pflag (minimal footprint)
 
 ---
 
-## Future Improvements
+## 🔮 Future Improvements
 
-- [ ] Add `devtool encode/decode` for Base64 and URL encoding
-- [ ] Add `devtool hash <file>` for MD5/SHA checksums
-- [ ] Add `devtool serve <folder>` to spin up a local HTTP file server
-- [ ] Add config file support (`.devtool.yaml`)
+- [ ] `devtool encode/decode` — Base64 and URL encoding
+- [ ] `devtool hash <file>` — MD5/SHA checksums
+- [ ] `devtool serve <folder>` — Local HTTP file server
+- [ ] Config file support (`.devtool.yaml`)
+- [ ] Unit tests for all utilities
 - [ ] Publish via `go install` for global installation
-- [ ] Add unit tests for all utilities
 
 ---
 
-## License
+## 📄 License
 
 MIT

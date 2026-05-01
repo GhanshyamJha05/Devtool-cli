@@ -7,65 +7,91 @@ import (
 	"strings"
 )
 
-// OrganizeFolder iterates over files in the target directory and moves them into categorized subfolders.
-func OrganizeFolder(targetDir string) error {
-	// Read all entries in the directory
+// CleanResult holds a summary of the clean operation for display.
+type CleanResult struct {
+	TotalFiles int
+	Skipped    int
+	Moved      map[string][]string // category → list of filenames
+}
+
+// OrganizeFolder reads a directory and moves files into categorized subfolders.
+// Returns a structured result for the caller to display.
+func OrganizeFolder(targetDir string) (*CleanResult, error) {
+	// Step 1: Validate that the path exists and is a directory
+	info, err := os.Stat(targetDir)
+	if os.IsNotExist(err) {
+		return nil, fmt.Errorf("directory not found: '%s'", targetDir)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cannot access path '%s': %w", targetDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("'%s' is not a directory", targetDir)
+	}
+
+	// Step 2: Read entries
 	entries, err := os.ReadDir(targetDir)
 	if err != nil {
-		return fmt.Errorf("failed to read directory '%s': %w", targetDir, err)
+		return nil, fmt.Errorf("failed to read directory '%s': %w", targetDir, err)
+	}
+
+	result := &CleanResult{
+		Moved: make(map[string][]string),
 	}
 
 	for _, entry := range entries {
-		// Ignore nested directories, we only want to organize root-level files
 		if entry.IsDir() {
 			continue
 		}
 
 		fileName := entry.Name()
 		ext := strings.ToLower(filepath.Ext(fileName))
-		
-		// Skip files without extensions (like dotfiles or binaries)
+
+		// Skip files without extensions
 		if ext == "" {
-			continue 
+			result.Skipped++
+			continue
 		}
 
-		// Determine the subfolder based on the extension
-		categoryName := getCategoryForExtension(ext)
-		destFolderPath := filepath.Join(targetDir, categoryName)
+		result.TotalFiles++
+		category := getCategoryForExtension(ext)
+		destFolder := filepath.Join(targetDir, category)
 
-		// Create the subfolder if it does not exist yet (0755 permissions is standard)
-		if err := os.MkdirAll(destFolderPath, 0755); err != nil {
-			return fmt.Errorf("failed to create directory '%s': %w", destFolderPath, err)
+		// Create category folder if needed
+		if err := os.MkdirAll(destFolder, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create folder '%s': %w", destFolder, err)
 		}
 
-		// Move the file into the new directory
 		oldPath := filepath.Join(targetDir, fileName)
-		newPath := filepath.Join(destFolderPath, fileName)
-		
-		// os.Rename acts as a move command
+		newPath := filepath.Join(destFolder, fileName)
+
 		if err := os.Rename(oldPath, newPath); err != nil {
-			return fmt.Errorf("failed to move file '%s' to '%s': %w", fileName, newPath, err)
+			return nil, fmt.Errorf("failed to move '%s': %w", fileName, err)
 		}
+
+		result.Moved[category] = append(result.Moved[category], fileName)
 	}
 
-	return nil
+	return result, nil
 }
 
-// getCategoryForExtension acts as a router mapping file extensions to human-readable folder names.
+// getCategoryForExtension maps file extensions to human-readable folder names.
 func getCategoryForExtension(ext string) string {
 	switch ext {
-	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico":
+	case ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico", ".bmp":
 		return "Images"
-	case ".pdf", ".doc", ".docx", ".txt", ".md", ".csv":
+	case ".pdf", ".doc", ".docx", ".txt", ".md", ".csv", ".xlsx", ".pptx":
 		return "Documents"
-	case ".mp4", ".mkv", ".avi", ".mov":
+	case ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv":
 		return "Videos"
-	case ".mp3", ".wav", ".flac":
+	case ".mp3", ".wav", ".flac", ".aac", ".ogg":
 		return "Audio"
-	case ".zip", ".tar", ".gz", ".rar":
+	case ".zip", ".tar", ".gz", ".rar", ".7z":
 		return "Archives"
-	case ".go", ".js", ".ts", ".py", ".java", ".json", ".html", ".css":
+	case ".go", ".js", ".ts", ".py", ".java", ".json", ".html", ".css", ".cpp", ".c", ".rs", ".rb":
 		return "Code"
+	case ".exe", ".msi", ".dmg", ".deb", ".rpm":
+		return "Executables"
 	default:
 		return "Others"
 	}

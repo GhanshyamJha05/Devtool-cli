@@ -9,45 +9,55 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// saveFormatted is the local flag for --save on format command
 var saveFormatted string
 
 var formatCmd = &cobra.Command{
 	Use:   "format <file.json>",
 	Short: "Pretty-print JSON files",
-	Args:  cobra.ExactArgs(1),
+	Long: `Read a JSON file, validate its structure, and output a beautifully formatted version.
+
+Examples:
+  devtool format config.json
+  devtool format data.json --save pretty.json
+  devtool format response.json --verbose`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		filePath := args[0]
 
 		if Verbose {
-			utils.PrintDebug(fmt.Sprintf("Reading JSON file: %s", filePath))
+			utils.PrintDebug(fmt.Sprintf("Input file: %s", filePath))
 		}
 
-		formattedJSON, err := utils.FormatJSON(filePath)
+		utils.PrintInfo(fmt.Sprintf("Formatting %s...", filePath))
+
+		formatted, err := utils.FormatJSON(filePath)
 		if err != nil {
 			utils.PrintError(err.Error())
 			return err
 		}
 
-		// If --save flag is provided, write formatted JSON to that file
+		// Save to file or print to stdout
 		if saveFormatted != "" {
 			if Verbose {
-				utils.PrintDebug(fmt.Sprintf("Writing formatted output to: %s", saveFormatted))
+				utils.PrintDebug(fmt.Sprintf("Writing output to: %s", saveFormatted))
 			}
-			if err := os.WriteFile(saveFormatted, []byte(formattedJSON+"\n"), 0644); err != nil {
-				return fmt.Errorf("failed to save to file '%s': %w", saveFormatted, err)
+			if err := os.WriteFile(saveFormatted, []byte(formatted+"\n"), 0644); err != nil {
+				utils.PrintError(fmt.Sprintf("Failed to save: %s", err.Error()))
+				return err
 			}
 			utils.PrintSuccess(fmt.Sprintf("Formatted JSON saved to %s", saveFormatted))
 			return nil
 		}
 
-		fmt.Println(formattedJSON)
-		utils.PrintSuccess("JSON formatted successfully")
+		fmt.Println()
+		fmt.Println(formatted)
+		fmt.Println()
+		utils.PrintSuccess("JSON is valid and formatted")
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(formatCmd)
-	formatCmd.Flags().StringVarP(&saveFormatted, "save", "s", "", "save formatted output to a file (e.g., --save pretty.json)")
+	formatCmd.Flags().StringVarP(&saveFormatted, "save", "s", "", "save formatted output to a file")
 }

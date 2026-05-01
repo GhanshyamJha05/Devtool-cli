@@ -9,48 +9,63 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// saveFile is the local flag for --save
 var saveFile string
 
 var getCmd = &cobra.Command{
 	Use:   "get <url>",
 	Short: "Fetch API data and display response",
-	Args:  cobra.ExactArgs(1),
+	Long: `Fetch data from any HTTP/HTTPS URL and display the response.
+Supports saving output to a file and verbose debug mode.
+
+Examples:
+  devtool get https://jsonplaceholder.typicode.com/posts/1
+  devtool get https://api.github.com/users/octocat --save user.json
+  devtool get https://httpbin.org/get --verbose`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		url := args[0]
+		rawURL := args[0]
 
 		if Verbose {
-			utils.PrintDebug(fmt.Sprintf("Target URL: %s", url))
+			utils.PrintDebug(fmt.Sprintf("Target URL: %s", rawURL))
 		}
 
-		utils.PrintInfo(fmt.Sprintf("Fetching data from %s...", url))
+		utils.PrintInfo(fmt.Sprintf("Fetching data from %s...", rawURL))
 
-		data, err := utils.FetchData(url)
+		resp, err := utils.FetchData(rawURL)
 		if err != nil {
 			utils.PrintError(err.Error())
 			return err
 		}
 
-		// If --save flag is provided, write to file instead of stdout
+		// Display response metadata
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			utils.PrintSuccess(fmt.Sprintf("Status: %s  |  Time: %s", resp.Status, resp.Duration.Round(1000000)))
+		} else {
+			utils.PrintWarning(fmt.Sprintf("Status: %s  |  Time: %s", resp.Status, resp.Duration.Round(1000000)))
+		}
+
+		if Verbose {
+			utils.PrintDebug(fmt.Sprintf("Content-Type: %s", resp.Headers.Get("Content-Type")))
+			utils.PrintDebug(fmt.Sprintf("Content-Length: %s", resp.Headers.Get("Content-Length")))
+		}
+
+		// Save to file or print to stdout
 		if saveFile != "" {
-			if Verbose {
-				utils.PrintDebug(fmt.Sprintf("Saving response to file: %s", saveFile))
+			if err := os.WriteFile(saveFile, []byte(resp.Body), 0644); err != nil {
+				utils.PrintError(fmt.Sprintf("Failed to save: %s", err.Error()))
+				return err
 			}
-			if err := os.WriteFile(saveFile, []byte(data), 0644); err != nil {
-				return fmt.Errorf("failed to save to file '%s': %w", saveFile, err)
-			}
-			utils.PrintSuccess(fmt.Sprintf("Response saved to %s", saveFile))
+			utils.PrintSuccess(fmt.Sprintf("Response saved to %s (%d bytes)", saveFile, len(resp.Body)))
 			return nil
 		}
 
-		fmt.Println(data)
-		utils.PrintSuccess("Request completed successfully")
+		fmt.Println()
+		fmt.Println(resp.Body)
 		return nil
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(getCmd)
-	// Local flag: only available on the "get" command
 	getCmd.Flags().StringVarP(&saveFile, "save", "s", "", "save response to a file (e.g., --save output.json)")
 }
