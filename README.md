@@ -1,4 +1,4 @@
-# Devtool-CLI
+# Devtool-Cli
 
 > A production-quality developer productivity tool built in Go with modular architecture, powered by [Cobra](https://github.com/spf13/cobra).
 
