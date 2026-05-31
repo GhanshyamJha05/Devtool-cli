@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"devtool-cli/internal/utils"
+	"github.com/GhanshyamJha05/devtool-cli/internal/utils"
 
 	"github.com/spf13/cobra"
 )

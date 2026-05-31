@@ -1,4 +1,4 @@
-module devtool-cli
+module github.com/GhanshyamJha05/devtool-cli
 
 go 1.25.4
 
