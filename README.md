@@ -7,10 +7,9 @@ It can fetch API responses, format JSON files, and organize a messy folder by fi
 ## Preview
 
 
-```md
-<img width="1585" height="1025" alt="image" src="https://github.com/user-attachments/assets/7b2c3e42-ac62-418b-b5f8-39e4e0b40d0d" />
 
-```
+![image](https://github.com/user-attachments/assets/7b2c3e42-ac62-418b-b5f8-39e4e0b40d0d)
+
 
 Live site:
 
