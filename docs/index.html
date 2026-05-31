@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>devtool-cli — Developer Productivity, Handcrafted</title>
+  <meta name="description" content="devtool-cli is a production-quality Go CLI tool that automates common developer tasks — fetch APIs, format JSON, and organize messy folders from your terminal with colored output and smart error handling." />
+  <meta name="keywords" content="devtool, CLI, Go, golang, developer tool, API fetch, JSON formatter, file organizer" />
+
+  <!-- Google Fonts: Kalam (headings) + Patrick Hand (body) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Patrick+Hand&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ═══════════════════════════════════════════════════
+       DESIGN TOKENS
+    ═══════════════════════════════════════════════════ */
+    :root {
+      --bg:             #fdfbf7;
+      --fg:             #2d2d2d;
+      --muted:          #e5e0d8;
+      --accent:         #ff4d4d;
+      --blue:           #2d5da1;
+      --white:          #ffffff;
+      --yellow:         #fff9c4;
+
+      --shadow:         4px 4px 0px 0px #2d2d2d;
+      --shadow-lg:      8px 8px 0px 0px #2d2d2d;
+      --shadow-sm:      2px 2px 0px 0px #2d2d2d;
+      --shadow-accent:  4px 4px 0px 0px var(--accent);
+
+      /* Wobbly border-radius presets */
+      --r-wobbly:    255px 15px 225px 15px / 15px 225px 15px 255px;
+      --r-wobbly-b:  15px 225px 15px 255px / 225px 15px 255px 15px;
+      --r-wobbly-sm: 120px 8px 100px 8px  / 8px 100px 8px 120px;
+      --r-pill:      80px 6px 80px 6px    / 6px 80px 6px 80px;
+
+      --font-heading: 'Kalam', cursive;
+      --font-body:    'Patrick Hand', cursive;
+      --font-mono:    'Courier New', Courier, monospace;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       RESET & BASE
+    ═══════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--bg);
+      background-image: radial-gradient(var(--muted) 1px, transparent 1px);
+      background-size: 24px 24px;
+      color: var(--fg);
+      font-size: 18px;
+      line-height: 1.65;
+      overflow-x: hidden;
+    }
+
+    img { display: block; max-width: 100%; }
+    code { font-family: var(--font-mono); }
+
+    /* ═══════════════════════════════════════════════════
+       LAYOUT UTILITIES
+    ═══════════════════════════════════════════════════ */
+    .container        { max-width: 1080px; margin: 0 auto; padding: 0 24px; }
+    .container-narrow { max-width: 760px;  margin: 0 auto; padding: 0 24px; }
+    section { padding: 88px 0; }
+
+    /* ═══════════════════════════════════════════════════
+       TYPOGRAPHY
+    ═══════════════════════════════════════════════════ */
+    h1, h2, h3, h4 {
+      font-family: var(--font-heading);
+      color: var(--fg);
+      line-height: 1.15;
+    }
+    h1 { font-size: clamp(2.6rem, 6vw, 4.2rem); font-weight: 700; }
+    h2 { font-size: clamp(2rem,   4vw, 3.2rem); font-weight: 700; }
+    h3 { font-size: 1.4rem; font-weight: 700; }
+    p  { line-height: 1.7; }
+
+    .wavy {
+      text-decoration: underline wavy var(--accent);
+      text-decoration-thickness: 2px;
+      text-underline-offset: 5px;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       BUTTONS
+    ═══════════════════════════════════════════════════ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-body);
+      font-size: 1.1rem;
+      padding: 12px 28px;
+      border: 3px solid var(--fg);
+      border-radius: var(--r-wobbly-sm);
+      background: var(--white);
+      color: var(--fg);
+      cursor: pointer;
+      text-decoration: none;
+      box-shadow: var(--shadow);
+      transition: background 0.1s, color 0.1s, box-shadow 0.1s, transform 0.1s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .btn:hover  { background: var(--accent); color: var(--white); box-shadow: var(--shadow-sm); transform: translate(2px,2px); }
+    .btn:active { box-shadow: none; transform: translate(4px,4px); }
+
+    .btn-secondary       { background: var(--muted); }
+    .btn-secondary:hover { background: var(--blue); color: var(--white); }
+
+    .btn-lg { font-size: 1.25rem; padding: 16px 36px; }
+
+    /* ═══════════════════════════════════════════════════
+       STICKY NOTE SECTION LABEL
+    ═══════════════════════════════════════════════════ */
+    .section-label {
+      display: inline-block;
+      font-family: var(--font-body);
+      font-size: 0.9rem;
+      letter-spacing: 0.06em;
+      background: var(--yellow);
+      border: 2px solid var(--fg);
+      border-radius: 4px 10px 4px 10px / 10px 4px 10px 4px;
+      padding: 4px 16px;
+      box-shadow: 2px 2px 0px var(--fg);
+      transform: rotate(-1.2deg);
+      margin-bottom: 18px;
+    }
+
+    .section-header { text-align: center; }
+    .section-header h2 { margin-bottom: 14px; }
+    .section-header p  { font-size: 1.1rem; opacity: 0.8; max-width: 540px; margin: 0 auto; }
+
+    /* ═══════════════════════════════════════════════════
+       NAVBAR
+    ═══════════════════════════════════════════════════ */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: var(--bg);
+      border-bottom: 2.5px solid var(--fg);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      max-width: 1080px;
+      margin: 0 auto;
+    }
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-heading);
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--fg);
+      text-decoration: none;
+    }
+    .nav-logo-icon {
+      width: 38px; height: 38px;
+      background: var(--fg); color: var(--bg);
+      border-radius: 10px 2px 10px 2px / 2px 10px 2px 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; flex-shrink: 0;
+    }
+    .nav-links {
+      display: flex; align-items: center;
+      gap: 4px; list-style: none;
+    }
+    .nav-links a {
+      font-family: var(--font-body);
+      font-size: 1rem;
+      color: var(--fg);
+      text-decoration: none;
+      padding: 6px 16px;
+      border-radius: var(--r-pill);
+      border: 2px solid transparent;
+      position: relative;
+      transition: color 0.15s;
+    }
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: 3px; left: 16px; right: 16px;
+      height: 2px;
+      background: var(--accent);
+      border-radius: 2px;
+      transform: scaleX(0);
+      transition: transform 0.15s;
+    }
+    .nav-links a:hover { color: var(--accent); }
+    .nav-links a:hover::after { transform: scaleX(1); }
+
+    .nav-right { display: flex; align-items: center; gap: 12px; }
+
+    /* Hamburger */
+    .hamburger {
+      display: none; flex-direction: column;
+      gap: 5px; cursor: pointer; padding: 4px;
+      background: none; border: none;
+    }
+    .hamburger span {
+      display: block; width: 24px; height: 2.5px;
+      background: var(--fg); border-radius: 2px;
+      transition: transform 0.2s, opacity 0.2s;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7.5px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7.5px) rotate(-45deg); }
+
+    .mobile-nav {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      padding: 8px 24px 16px;
+      border-top: 1.5px dashed var(--muted);
+    }
+    .mobile-nav.open { display: flex; }
+    .mobile-nav a {
+      font-family: var(--font-body); font-size: 1.1rem;
+      color: var(--fg); text-decoration: none;
+      padding: 10px 0;
+      border-bottom: 1.5px dashed var(--muted);
+    }
+    .mobile-nav a:last-child { border-bottom: none; }
+
+    @media (max-width: 767px) {
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+    }
+
+    /* ═══════════════════════════════════════════════════
+       HERO
+    ═══════════════════════════════════════════════════ */
+    .hero { padding: 72px 0 60px; }
+
+    .hero-inner {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 52px;
+      align-items: center;
+    }
+    @media (max-width: 767px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 40px; }
+    }
+
+    /* Badge */
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      border: 2px solid var(--fg);
+      border-radius: 100px;
+      padding: 6px 18px;
+      font-size: 0.9rem;
+      margin-bottom: 22px;
+      box-shadow: var(--shadow-sm);
+      background: var(--white);
+    }
+    .badge-dot {
+      width: 9px; height: 9px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: 0.55; transform: scale(0.75); }
+    }
+
+    .hero-title { margin-bottom: 22px; }
+    .rotate-char {
+      display: inline-block;
+      color: var(--accent);
+      animation: jiggle 2.2s ease-in-out infinite;
+    }
+    @keyframes jiggle {
+      0%,100% { transform: rotate(-6deg); }
+      50%      { transform: rotate(12deg); }
+    }
+
+    .hero-subtitle {
+      font-size: 1.15rem;
+      opacity: 0.82;
+      margin-bottom: 28px;
+      max-width: 460px;
+    }
+
+    /* Install snippet */
+    .install-snippet {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--fg);
+      color: var(--bg);
+      border: 3px solid var(--fg);
+      border-radius: var(--r-wobbly-sm);
+      padding: 13px 20px;
+      font-family: var(--font-mono);
+      font-size: 0.88rem;
+      margin-bottom: 28px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: box-shadow 0.1s, transform 0.1s;
+      max-width: 100%;
+      overflow: hidden;
+    }
+    .install-snippet:hover  { box-shadow: var(--shadow-sm); transform: translate(2px,2px); }
+    .install-snippet:active { box-shadow: none; transform: translate(4px,4px); }
+    .install-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .copy-icon { opacity: 0.55; flex-shrink: 0; transition: opacity 0.2s; }
+    .install-snippet:hover .copy-icon { opacity: 1; }
+    .copy-feedback {
+      font-family: var(--font-body); font-size: 0.82rem;
+      color: #6ef5a0; white-space: nowrap; flex-shrink: 0;
+      opacity: 0; transition: opacity 0.3s;
+    }
+    .copy-feedback.show { opacity: 1; }
+
+    .hero-actions {
+      display: flex; align-items: center;
+      gap: 14px; flex-wrap: wrap;
+      position: relative;
+    }
+
+    /* SVG hand-drawn arrow (desktop only) */
+    .hero-arrow {
+      position: absolute;
+      left: 270px; bottom: -44px;
+      pointer-events: none;
+      display: none;
+    }
+    @media (min-width: 768px) { .hero-arrow { display: block; } }
+
+    /* Terminal panel */
+    .hero-terminal-wrap { position: relative; }
+    .hero-terminal {
+      background: #0d1117;
+      border: 3px solid var(--fg);
+      border-radius: var(--r-wobbly-b);
+      box-shadow: var(--shadow-lg);
+      overflow: hidden;
+      transform: rotate(1.2deg);
+    }
+    .terminal-bar {
+      background: #161b22;
+      padding: 10px 16px;
+      display: flex; align-items: center; gap: 8px;
+      border-bottom: 2px solid var(--fg);
+    }
+    .t-dot {
+      width: 13px; height: 13px;
+      border-radius: 50%;
+      border: 1.5px solid rgba(0,0,0,0.3);
+    }
+    .t-dot:nth-child(1) { background: #ff5f57; }
+    .t-dot:nth-child(2) { background: #febc2e; }
+    .t-dot:nth-child(3) { background: #28c840; }
+    .terminal-title {
+      font-family: var(--font-mono); font-size: 0.78rem;
+      color: #6e7681; margin-left: 6px;
+    }
+    .terminal-body {
+      padding: 20px 22px;
+      font-family: var(--font-mono); font-size: 0.88rem;
+      line-height: 1.9; color: #c9d1d9;
+      min-height: 230px;
+    }
+
+    /* Bouncing circle */
+    .bounce-circle {
+      position: absolute;
+      right: -22px; bottom: -28px;
+      width: 60px; height: 60px;
+      border: 3px dashed var(--fg);
+      border-radius: 50%;
+      animation: bounce 3s ease-in-out infinite;
+      display: none;
+      pointer-events: none;
+    }
+    @media (min-width: 768px) { .bounce-circle { display: block; } }
+    @keyframes bounce {
+      0%,100% { transform: translateY(0) rotate(0deg); }
+      50%      { transform: translateY(-16px) rotate(18deg); }
+    }
+
+    /* ═══════════════════════════════════════════════════
+       STATS
+    ═══════════════════════════════════════════════════ */
+    .stats {
+      padding: 48px 0;
+      border-top: 2px dashed var(--muted);
+      border-bottom: 2px dashed var(--muted);
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+    @media (min-width: 560px) { .stats-grid { grid-template-columns: repeat(4, 1fr); } }
+
+    .stat-blob {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; gap: 6px;
+      background: var(--white);
+      border: 2px solid var(--fg);
+      padding: 28px 16px;
+      box-shadow: var(--shadow);
+      transition: transform 0.2s;
+    }
+    .stat-blob:nth-child(1) { border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px; transform: rotate(-0.8deg); }
+    .stat-blob:nth-child(2) { border-radius: 15px 225px 15px 255px / 225px 15px 255px 15px; transform: rotate(1.2deg); }
+    .stat-blob:nth-child(3) { border-radius: 100px 15px 100px 15px / 15px 100px 15px 100px; transform: rotate(-1.5deg); }
+    .stat-blob:nth-child(4) { border-radius: 15px 255px 15px 225px / 255px 15px 225px 15px; transform: rotate(0.6deg); }
+    .stat-blob:hover { transform: rotate(0deg) scale(1.04); box-shadow: var(--shadow-lg); }
+
+    .stat-number {
+      font-family: var(--font-heading); font-size: 2.6rem;
+      font-weight: 700; color: var(--fg); line-height: 1;
+    }
+    .stat-label { font-size: 0.92rem; opacity: 0.72; }
+
+    /* ═══════════════════════════════════════════════════
+       FEATURES
+    ═══════════════════════════════════════════════════ */
+    #features { background: none; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 28px;
+      margin-top: 52px;
+    }
+    @media (min-width: 600px) { .features-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .feature-card {
+      background: var(--white);
+      border: 2.5px solid var(--fg);
+      border-radius: var(--r-wobbly-b);
+      padding: 40px 28px 28px;
+      box-shadow: var(--shadow);
+      position: relative;
+      transition: transform 0.15s, box-shadow 0.15s;
+      overflow: visible;
+    }
+    .feature-card:nth-child(1) { transform: rotate(-0.6deg); }
+    .feature-card:nth-child(2) { transform: rotate(1deg);  background: var(--yellow); border-radius: var(--r-wobbly); }
+    .feature-card:nth-child(3) { transform: rotate(-1.2deg); }
+    .feature-card:nth-child(4) { transform: rotate(0.8deg); border-radius: var(--r-wobbly); }
+    .feature-card:hover { transform: rotate(0deg) translateY(-5px); box-shadow: var(--shadow-lg); }
+
+    /* Tape strip */
+    .tape {
+      position: absolute;
+      top: -10px; left: 50%;
+      transform: translateX(-50%) rotate(-1.5deg);
+      width: 72px; height: 26px;
+      background: rgba(190,190,190,0.52);
+      border: 1.5px solid rgba(0,0,0,0.1);
+      border-radius: 2px;
+      z-index: 2;
+    }
+    /* Thumbtack */
+    .tack {
+      position: absolute;
+      top: -11px; left: 50%;
+      transform: translateX(-50%);
+      width: 22px; height: 22px;
+      background: var(--accent);
+      border: 2px solid var(--fg);
+      border-radius: 50%;
+      box-shadow: 1px 1px 0px var(--fg);
+      z-index: 2;
+    }
+
+    .feature-icon {
+      width: 54px; height: 54px;
+      background: var(--fg); color: var(--bg);
+      border-radius: 50%;
+      border: 2px solid var(--fg);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 18px;
+      box-shadow: 2px 2px 0px var(--fg);
+    }
+    .feature-title { font-size: 1.5rem; margin-bottom: 10px; }
+    .feature-desc  { font-size: 1rem; opacity: 0.84; margin-bottom: 18px; }
+    .feature-cmd {
+      display: inline-block;
+      font-family: var(--font-mono); font-size: 0.82rem;
+      background: var(--fg); color: var(--bg);
+      padding: 6px 14px;
+      border-radius: var(--r-wobbly-sm);
+      border: 2px solid var(--fg);
+    }
+    .feature-flag {
+      display: inline-block;
+      font-family: var(--font-mono); font-size: 0.78rem;
+      background: var(--blue); color: var(--white);
+      padding: 3px 10px;
+      border-radius: var(--r-pill);
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       HOW IT WORKS
+    ═══════════════════════════════════════════════════ */
+    #how-it-works {
+      background: var(--white);
+      border-top: 2.5px solid var(--fg);
+      border-bottom: 2.5px solid var(--fg);
+    }
+
+    .steps-wrap {
+      position: relative;
+      margin-top: 52px;
+    }
+    .steps-row {
+      display: flex;
+      flex-direction: column;
+      gap: 36px;
+    }
+    @media (min-width: 768px) {
+      .steps-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+    }
+
+    .step { flex: 1; text-align: center; position: relative; z-index: 1; }
+
+    .step-num {
+      width: 62px; height: 62px;
+      background: var(--accent); color: var(--white);
+      border: 3px solid var(--fg);
+      border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-heading); font-size: 1.7rem;
+      margin: 0 auto 18px;
+      box-shadow: var(--shadow);
+      position: relative; z-index: 2;
+    }
+    .step-title { font-size: 1.3rem; margin-bottom: 8px; }
+    .step-desc  { font-size: 0.97rem; opacity: 0.8; max-width: 220px; margin: 0 auto; }
+    .step-desc code { background: var(--muted); padding: 1px 6px; border-radius: 4px; font-size: 0.85rem; }
+
+    /* Squiggly SVG connector line */
+    .squiggly {
+      display: none;
+      position: absolute;
+      top: 28px; left: 0; width: 100%;
+      pointer-events: none; z-index: 0;
+    }
+    @media (min-width: 768px) { .squiggly { display: block; } }
+
+    /* ═══════════════════════════════════════════════════
+       INTERACTIVE TERMINAL DEMO
+    ═══════════════════════════════════════════════════ */
+    #demo {
+      background: var(--yellow);
+      border-top: 2.5px solid var(--fg);
+      border-bottom: 2.5px solid var(--fg);
+    }
+
+    .demo-tabs {
+      display: flex; gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 22px;
+    }
+    .demo-tab {
+      font-family: var(--font-mono); font-size: 0.92rem;
+      padding: 9px 20px;
+      border: 2.5px solid var(--fg);
+      background: var(--white);
+      border-radius: var(--r-wobbly-sm);
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.1s;
+    }
+    .demo-tab:hover  { transform: translate(1px,1px); box-shadow: none; }
+    .demo-tab.active {
+      background: var(--fg); color: var(--bg);
+      box-shadow: none; transform: translate(2px,2px);
+    }
+
+    .demo-panel {
+      background: #0d1117;
+      border: 3px solid var(--fg);
+      border-radius: var(--r-wobbly-b);
+      overflow: hidden;
+      box-shadow: var(--shadow-lg);
+      transform: rotate(-0.5deg);
+    }
+
+    .demo-content {
+      display: none;
+      padding: 24px 26px;
+      font-family: var(--font-mono); font-size: 0.88rem;
+      line-height: 2; color: #c9d1d9;
+      min-height: 200px;
+    }
+    .demo-content.active { display: block; }
+
+    /* terminal color helpers */
+    .t-prompt  { color: #28c840; }
+    .t-cmd     { color: #79c0ff; }
+    .t-ok      { color: #28c840; }
+    .t-warn    { color: #f0a500; }
+    .t-info    { color: #a29bfe; }
+    .t-str     { color: #a5d6ff; }
+    .t-num     { color: #79c0ff; }
+    .t-key     { color: #f6c90e; }
+    .t-muted   { color: #6e7681; }
+    .t-err     { color: var(--accent); }
+
+    /* ═══════════════════════════════════════════════════
+       ERROR HANDLING ACCORDION
+    ═══════════════════════════════════════════════════ */
+    .errors-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+      margin-top: 52px;
+    }
+    @media (min-width: 600px) { .errors-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .err-card {
+      background: var(--white);
+      border: 2.5px solid var(--fg);
+      border-radius: var(--r-wobbly-sm);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+    .err-card:hover        { transform: rotate(0.6deg); }
+    .err-card:nth-child(even):hover { transform: rotate(-0.6deg); }
+
+    .err-header {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 2px solid transparent;
+      background: var(--white);
+      transition: border-color 0.2s;
+    }
+    .err-card.open .err-header { border-bottom-color: var(--fg); }
+
+    .err-title {
+      display: flex; align-items: center;
+      gap: 10px; font-size: 1rem;
+    }
+    .err-icon {
+      width: 28px; height: 28px;
+      background: var(--accent); color: var(--white);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.85rem; font-weight: 700;
+      border: 1.5px solid var(--fg);
+      flex-shrink: 0;
+    }
+    .err-chevron {
+      font-size: 0.75rem; opacity: 0.55;
+      transition: transform 0.22s;
+    }
+    .err-card.open .err-chevron { transform: rotate(180deg); }
+
+    .err-body {
+      max-height: 0; overflow: hidden;
+      transition: max-height 0.28s ease;
+    }
+    .err-card.open .err-body { max-height: 160px; }
+
+    .err-code {
+      padding: 16px 20px;
+      font-family: var(--font-mono); font-size: 0.82rem;
+      line-height: 1.9; background: #0d1117; color: #c9d1d9;
+    }
+
+    /* ═══════════════════════════════════════════════════
+       GLOBAL FLAGS CALLOUT
+    ═══════════════════════════════════════════════════ */
+    .flags-section { background: none; padding: 0 0 88px; }
+    .flags-card {
+      background: var(--fg); color: var(--bg);
+      border: 3px solid var(--fg);
+      border-radius: var(--r-wobbly);
+      padding: 44px 48px;
+      box-shadow: var(--shadow-lg);
+      transform: rotate(-0.5deg);
+      position: relative;
+      overflow: hidden;
+    }
+    .flags-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        transparent, transparent 10px,
+        rgba(255,255,255,0.03) 10px, rgba(255,255,255,0.03) 11px
+      );
+      pointer-events: none;
+    }
+    .flags-card h3 { color: var(--bg); font-size: 1.8rem; margin-bottom: 24px; }
+    .flag-row {
+      display: flex; align-items: flex-start;
+      gap: 16px; margin-bottom: 18px;
+    }
+    .flag-badge {
+      display: inline-block;
+      font-family: var(--font-mono); font-size: 0.85rem;
+      background: var(--accent); color: var(--white);
+      padding: 4px 12px;
+      border-radius: var(--r-wobbly-sm);
+      border: 2px solid var(--white);
+      white-space: nowrap; flex-shrink: 0;
+      box-shadow: 2px 2px 0px rgba(255,255,255,0.3);
+    }
+    .flag-desc { opacity: 0.8; font-size: 1rem; }
+
+    /* ═══════════════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════════════ */
+    footer {
+      background: var(--fg);
+      color: var(--bg);
+      padding: 64px 0 40px;
+      border-top: 3px solid var(--fg);
+    }
+    .footer-inner {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 48px;
+    }
+    @media (min-width: 768px) {
+      .footer-inner { grid-template-columns: 2fr 1fr 1fr; gap: 32px; }
+    }
+
+    .footer-brand {
+      display: flex; align-items: center;
+      gap: 10px;
+      font-family: var(--font-heading); font-size: 1.5rem;
+      margin-bottom: 14px;
+    }
+    .footer-brand-icon {
+      width: 38px; height: 38px;
+      background: var(--bg); color: var(--fg);
+      border-radius: 10px 2px 10px 2px / 2px 10px 2px 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem; flex-shrink: 0;
+    }
+    .footer-desc { opacity: 0.68; font-size: 0.95rem; max-width: 310px; }
+
+    .footer-col h4 {
+      font-family: var(--font-heading); color: var(--bg);
+      font-size: 1.1rem; margin-bottom: 18px;
+      display: inline-block; position: relative;
+    }
+    .footer-col h4::after {
+      content: '';
+      position: absolute; bottom: -4px; left: 0; right: 0;
+      height: 2px; background: var(--accent); border-radius: 2px;
+    }
+    .footer-links { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-links a {
+      color: rgba(253,251,247,0.68); text-decoration: none;
+      font-size: 0.95rem; transition: color 0.15s;
+      display: inline-block;
+    }
+    .footer-links a:hover { color: var(--bg); text-decoration: line-through; }
+
+    .footer-bottom {
+      margin-top: 52px;
+      padding-top: 24px;
+      border-top: 1.5px dashed rgba(253,251,247,0.25);
+      display: flex; align-items: center;
+      justify-content: space-between; flex-wrap: wrap;
+      gap: 12px; font-size: 0.88rem; opacity: 0.6;
+    }
+    .footer-bottom a {
+      color: inherit;
+      text-decoration: underline wavy var(--accent);
+      text-decoration-thickness: 1px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════
+       NAVBAR
+  ════════════════════════════════════════════════ -->
+  <nav id="nav" role="navigation" aria-label="Main navigation">
+    <div class="nav-inner">
+      <a href="#" class="nav-logo" aria-label="devtool-cli home">
+        <div class="nav-logo-icon" aria-hidden="true">⚙</div>
+        devtool<span style="color:var(--accent)">-cli</span>
+      </a>
+
+      <ul class="nav-links" role="list">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">Guide</a></li>
+        <li><a href="#demo">Demo</a></li>
+        <li><a href="#errors">Errors</a></li>
+      </ul>
+
+      <div class="nav-right">
+        <a href="https://github.com/GhanshyamJha05/Devtool-cli"
+           class="btn btn-secondary"
+           target="_blank" rel="noopener noreferrer"
+           id="nav-github-btn"
+           aria-label="View on GitHub">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+        <button class="hamburger" id="hamburger" aria-label="Toggle menu" aria-expanded="false">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-nav" id="mobileNav" role="menu">
+      <a href="#features"    onclick="closeMobileNav()">Features</a>
+      <a href="#how-it-works" onclick="closeMobileNav()">Guide</a>
+      <a href="#demo"        onclick="closeMobileNav()">Demo</a>
+      <a href="#errors"      onclick="closeMobileNav()">Errors</a>
+    </div>
+  </nav>
+
+
+  <!-- ════════════════════════════════════════════════
+       HERO
+  ════════════════════════════════════════════════ -->
+  <section class="hero" aria-label="Hero">
+    <div class="container">
+      <div class="hero-inner">
+
+        <!-- Left: Copy -->
+        <div>
+          <div class="hero-badge" role="note">
+            <span class="badge-dot" aria-hidden="true"></span>
+            v1.0.0 &nbsp;·&nbsp; MIT License &nbsp;·&nbsp; Go 1.21+
+          </div>
+
+          <h1 class="hero-title">
+            Your terminal,<br>
+            but actually<br>
+            <span class="wavy">productive</span><span class="rotate-char" aria-hidden="true">!</span>
+          </h1>
+
+          <p class="hero-subtitle">
+            A modular Go CLI that automates API fetching, JSON formatting,
+            and file organization — all from your terminal with colored output,
+            smart flags, and real-world error handling.
+          </p>
+
+          <!-- Install snippet -->
+          <div class="install-snippet"
+               id="installSnippet"
+               onclick="copyInstall()"
+               role="button"
+               tabindex="0"
+               aria-label="Copy install command to clipboard"
+               onkeydown="if(event.key==='Enter'||event.key===' ')copyInstall()">
+            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24"
+                 fill="none" stroke="currentColor" stroke-width="2.5"
+                 aria-hidden="true">
+              <rect x="9" y="9" width="13" height="13" rx="2"/>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+            </svg>
+            <span class="install-text">go install github.com/GhanshyamJha05/Devtool-cli@latest</span>
+            <span class="copy-feedback" id="copyFeedback" aria-live="polite">✔ copied!</span>
+          </div>
+
+          <!-- CTAs -->
+          <div class="hero-actions">
+            <a href="#features" class="btn btn-lg" id="hero-explore-btn">Explore Features ↓</a>
+            <a href="#demo"     class="btn btn-secondary btn-lg" id="hero-demo-btn">See It In Action</a>
+
+            <!-- Hand-drawn SVG arrow pointing to CTA -->
+            <svg class="hero-arrow" width="88" height="58" viewBox="0 0 88 58"
+                 fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M4 6 C18 5, 36 14, 56 34 C64 42, 72 50, 82 54"
+                    stroke="#2d2d2d" stroke-width="2.5" stroke-dasharray="6 4"
+                    stroke-linecap="round"/>
+              <path d="M76 48 L84 54 L76 60"
+                    stroke="#2d2d2d" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+              <text x="0" y="44" font-family="Patrick Hand, cursive" font-size="11"
+                    fill="#2d2d2d" transform="rotate(-12 0 44)">try it!</text>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Right: Live terminal -->
+        <div class="hero-terminal-wrap">
+          <div class="hero-terminal" role="img" aria-label="Terminal showing devtool get command">
+            <div class="terminal-bar" aria-hidden="true">
+              <div class="t-dot"></div>
+              <div class="t-dot"></div>
+              <div class="t-dot"></div>
+              <span class="terminal-title">devtool — zsh</span>
+            </div>
+            <div class="terminal-body" aria-hidden="true">
+              <div>
+                <span class="t-prompt">❯</span>&nbsp;
+                <span class="t-cmd">devtool get https://api.github.com/users/octocat</span>
+              </div>
+              <div><span class="t-info">ℹ</span>&nbsp;Fetching data from https://api.github.com/users/octocat...</div>
+              <div><span class="t-ok">✔</span>&nbsp;Status: 200 OK&nbsp;&nbsp;|&nbsp;&nbsp;Time: 312ms</div>
+              <div>&nbsp;</div>
+              <div>{</div>
+              <div>&nbsp;&nbsp;<span class="t-key">"login"</span>: <span class="t-str">"octocat"</span>,</div>
+              <div>&nbsp;&nbsp;<span class="t-key">"id"</span>: <span class="t-num">1</span>,</div>
+              <div>&nbsp;&nbsp;<span class="t-key">"name"</span>: <span class="t-str">"The Octocat"</span>,</div>
+              <div>&nbsp;&nbsp;<span class="t-key">"public_repos"</span>: <span class="t-num">8</span></div>
+              <div>}</div>
+            </div>
+          </div>
+
+          <div class="bounce-circle" aria-hidden="true"></div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       STATS BAR
+  ════════════════════════════════════════════════ -->
+  <section class="stats" aria-label="Key stats">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-blob">
+          <div class="stat-number">4</div>
+          <div class="stat-label">Commands</div>
+        </div>
+        <div class="stat-blob">
+          <div class="stat-number">0</div>
+          <div class="stat-label">Extra Deps</div>
+        </div>
+        <div class="stat-blob">
+          <div class="stat-number">10s</div>
+          <div class="stat-label">HTTP Timeout</div>
+        </div>
+        <div class="stat-blob">
+          <div class="stat-number">MIT</div>
+          <div class="stat-label">License</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       FEATURES
+  ════════════════════════════════════════════════ -->
+  <section id="features" aria-label="Features">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label" aria-hidden="true">✦ Commands</div>
+        <h2>Everything you need,<br>nothing you don't</h2>
+        <p>Four focused commands. Each does one thing extremely well — with rich output, smart flags, and battle-tested error handling.</p>
+      </div>
+
+      <div class="features-grid">
+
+        <!-- get -->
+        <div class="feature-card" tabindex="0">
+          <div class="tape" aria-hidden="true"></div>
+          <div class="feature-icon" aria-hidden="true">🌐</div>
+          <h3 class="feature-title">devtool get</h3>
+          <p class="feature-desc">Fetch any HTTP/HTTPS URL and see the response with status code, timing, and debug headers. Save to a file with <code>--save</code>.</p>
+          <code class="feature-cmd">devtool get &lt;url&gt;</code>
+          <span class="feature-flag">--save</span>
+          <span class="feature-flag">--verbose</span>
+        </div>
+
+        <!-- format -->
+        <div class="feature-card" tabindex="0">
+          <div class="tack" aria-hidden="true"></div>
+          <div class="feature-icon" aria-hidden="true">📋</div>
+          <h3 class="feature-title">devtool format</h3>
+          <p class="feature-desc">Validate and pretty-print any JSON file. Catches malformed JSON with clear, human-readable error messages — no squinting at raw output.</p>
+          <code class="feature-cmd">devtool format &lt;file.json&gt;</code>
+          <span class="feature-flag">--save</span>
+        </div>
+
+        <!-- clean -->
+        <div class="feature-card" tabindex="0">
+          <div class="tape" aria-hidden="true"></div>
+          <div class="feature-icon" aria-hidden="true">🗂️</div>
+          <h3 class="feature-title">devtool clean</h3>
+          <p class="feature-desc">Scan a messy directory and auto-sort files into categorized subfolders — Images, Documents, Code, Videos, Archives — with a full summary.</p>
+          <code class="feature-cmd">devtool clean &lt;folder&gt;</code>
+          <span class="feature-flag">--verbose</span>
+        </div>
+
+        <!-- version -->
+        <div class="feature-card" tabindex="0">
+          <div class="tack" aria-hidden="true"></div>
+          <div class="feature-icon" aria-hidden="true">🏷️</div>
+          <h3 class="feature-title">devtool version</h3>
+          <p class="feature-desc">Print version, commit hash, and build date — injected at build time via <code>-ldflags</code>. Always know exactly what's running in production.</p>
+          <code class="feature-cmd">devtool version</code>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       HOW IT WORKS
+  ════════════════════════════════════════════════ -->
+  <section id="how-it-works" aria-label="Getting started guide">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label" aria-hidden="true">✦ Guide</div>
+        <h2>Up and running<br>in 3 steps</h2>
+        <p>From zero to productive in under a minute. No config files, no environment setup — just build and run.</p>
+      </div>
+
+      <div class="steps-wrap">
+        <!-- Squiggly connector (desktop) -->
+        <svg class="squiggly" height="60" xmlns="http://www.w3.org/2000/svg"
+             preserveAspectRatio="none" aria-hidden="true">
+          <path d="M 17% 30 Q 25% 8, 33% 30 Q 41% 52, 50% 30 Q 58% 8, 67% 30 Q 75% 52, 83% 30"
+                stroke="#2d2d2d" stroke-width="2.2" stroke-dasharray="7 5"
+                fill="none" stroke-linecap="round"/>
+        </svg>
+
+        <div class="steps-row">
+          <div class="step">
+            <div class="step-num" aria-hidden="true">1</div>
+            <h3 class="step-title">Install</h3>
+            <p class="step-desc">
+              Clone the repo and run<br>
+              <code>go build -o devtool .</code><br>
+              or use <code>go install</code>.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-num" aria-hidden="true">2</div>
+            <h3 class="step-title">Run a Command</h3>
+            <p class="step-desc">
+              Pick a command — <code>get</code>, <code>format</code>, or <code>clean</code> — and pass your target as an argument.
+            </p>
+          </div>
+          <div class="step">
+            <div class="step-num" aria-hidden="true">3</div>
+            <h3 class="step-title">Add --verbose</h3>
+            <p class="step-desc">
+              Append <code>--verbose</code> to any command to see headers, file paths, and debug logs in real time.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       INTERACTIVE DEMO
+  ════════════════════════════════════════════════ -->
+  <section id="demo" aria-label="Interactive command demo">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label" aria-hidden="true">✦ Demo</div>
+        <h2>See every command<br>in action</h2>
+        <p>Click a tab to watch the command run. Real flags, real output.</p>
+      </div>
+
+      <div style="margin-top: 48px;">
+        <div class="demo-tabs" role="tablist" aria-label="Command demos">
+          <button class="demo-tab active" role="tab" aria-selected="true"
+                  aria-controls="demo-get"
+                  id="tab-get" onclick="switchTab('get', this)">$ get</button>
+          <button class="demo-tab" role="tab" aria-selected="false"
+                  aria-controls="demo-format"
+                  id="tab-format" onclick="switchTab('format', this)">$ format</button>
+          <button class="demo-tab" role="tab" aria-selected="false"
+                  aria-controls="demo-clean"
+                  id="tab-clean" onclick="switchTab('clean', this)">$ clean</button>
+          <button class="demo-tab" role="tab" aria-selected="false"
+                  aria-controls="demo-version"
+                  id="tab-version" onclick="switchTab('version', this)">$ version</button>
+        </div>
+
+        <div class="demo-panel" role="region" aria-label="Terminal output">
+          <div class="terminal-bar" aria-hidden="true">
+            <div class="t-dot"></div>
+            <div class="t-dot"></div>
+            <div class="t-dot"></div>
+            <span class="terminal-title">demo — devtool-cli</span>
+          </div>
+
+          <!-- get -->
+          <div class="demo-content active" id="demo-get" role="tabpanel" aria-labelledby="tab-get">
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">devtool get https://jsonplaceholder.typicode.com/posts/1 --save post.json</span></div>
+            <div><span class="t-info">ℹ</span> Fetching data from https://jsonplaceholder.typicode.com/posts/1...</div>
+            <div><span class="t-ok">✔</span> Status: 200 OK&nbsp;&nbsp;|&nbsp;&nbsp;Time: 287ms</div>
+            <div><span class="t-ok">✔</span> Response saved to post.json (292 bytes)</div>
+            <div>&nbsp;</div>
+            <div><span class="t-muted"># Try verbose mode to see headers:</span></div>
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">devtool get https://httpbin.org/get --verbose</span></div>
+            <div><span class="t-info">ℹ</span> [DEBUG] Target URL: https://httpbin.org/get</div>
+            <div><span class="t-info">ℹ</span> [DEBUG] Content-Type: application/json</div>
+          </div>
+
+          <!-- format -->
+          <div class="demo-content" id="demo-format" role="tabpanel" aria-labelledby="tab-format">
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">devtool format data.json</span></div>
+            <div><span class="t-info">ℹ</span> Formatting data.json...</div>
+            <div>&nbsp;</div>
+            <div>{</div>
+            <div>&nbsp;&nbsp;<span class="t-key">"id"</span>: <span class="t-num">1</span>,</div>
+            <div>&nbsp;&nbsp;<span class="t-key">"title"</span>: <span class="t-str">"sunt aut facere repellat..."</span>,</div>
+            <div>&nbsp;&nbsp;<span class="t-key">"body"</span>: <span class="t-str">"quia et suscipit suscipit..."</span>,</div>
+            <div>&nbsp;&nbsp;<span class="t-key">"userId"</span>: <span class="t-num">1</span></div>
+            <div>}</div>
+            <div>&nbsp;</div>
+            <div><span class="t-ok">✔</span> JSON is valid and formatted</div>
+          </div>
+
+          <!-- clean -->
+          <div class="demo-content" id="demo-clean" role="tabpanel" aria-labelledby="tab-clean">
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">devtool clean ./downloads</span></div>
+            <div><span class="t-info">ℹ</span> Scanning folder: ./downloads...</div>
+            <div>&nbsp;</div>
+            <div><span class="t-ok">✔</span> Images&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ 5 file(s)</div>
+            <div><span class="t-ok">✔</span> Documents&nbsp;&nbsp;&nbsp;&nbsp;→ 3 file(s)</div>
+            <div><span class="t-ok">✔</span> Code&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ 8 file(s)</div>
+            <div><span class="t-ok">✔</span> Archives&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;→ 2 file(s)</div>
+            <div><span class="t-warn">⚠</span> Skipped 1 file(s) with no extension</div>
+            <div>&nbsp;</div>
+            <div><span class="t-ok">✔</span> Done! Organized 18 file(s) into 4 categories</div>
+          </div>
+
+          <!-- version -->
+          <div class="demo-content" id="demo-version" role="tabpanel" aria-labelledby="tab-version">
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">devtool version</span></div>
+            <div>devtool-cli <span class="t-str">v1.0.0</span></div>
+            <div>&nbsp;&nbsp;commit : <span class="t-muted">abc1234</span></div>
+            <div>&nbsp;&nbsp;built&nbsp; : <span class="t-muted">2026-05-01</span></div>
+            <div>&nbsp;</div>
+            <div><span class="t-muted"># Build with version info injected:</span></div>
+            <div><span class="t-prompt">❯</span> <span class="t-cmd">go build -ldflags "-X main.version=1.0.0 -X main.commit=$(git rev-parse --short HEAD)" -o devtool .</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       GLOBAL FLAGS
+  ════════════════════════════════════════════════ -->
+  <section class="flags-section" aria-label="Global flags">
+    <div class="container">
+      <div class="flags-card">
+        <h3>Global Flags</h3>
+        <div class="flag-row">
+          <span class="flag-badge">--save, -s</span>
+          <p class="flag-desc">Available on <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px">get</code> and <code style="background:rgba(255,255,255,0.1);padding:1px 5px;border-radius:3px">format</code>. Save output to a file instead of printing to the terminal.</p>
+        </div>
+        <div class="flag-row">
+          <span class="flag-badge">--verbose, -v</span>
+          <p class="flag-desc">Available on all commands. Enable debug logging — response headers, content-type, file paths, and internal state.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       ERROR HANDLING
+  ════════════════════════════════════════════════ -->
+  <section id="errors" aria-label="Error handling">
+    <div class="container">
+      <div class="section-header">
+        <div class="section-label" aria-hidden="true">✦ Robustness</div>
+        <h2>Built for the<br>real world</h2>
+        <p>devtool-cli handles every edge case gracefully — no mysterious stack traces, just clear and actionable messages. Click any card to see the exact output.</p>
+      </div>
+
+      <div class="errors-grid">
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              Invalid URL
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool get not-a-url</span><br>
+              <span class="t-err">✖ URL must include scheme and host (e.g., https://example.com), got: not-a-url</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              Missing File
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool format missing.json</span><br>
+              <span class="t-err">✖ file not found: 'missing.json'</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              Wrong File Type
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool format README.md</span><br>
+              <span class="t-err">✖ expected a .json file, got '.md'</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              DNS Failure
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool get https://doesnotexist.invalid</span><br>
+              <span class="t-err">✖ DNS resolution failed — host not found</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              Request Timeout
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool get https://slow-server.example.com</span><br>
+              <span class="t-err">✖ request timed out after 10s</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="err-card" onclick="toggleError(this)" tabindex="0"
+             role="button" aria-expanded="false"
+             onkeydown="if(event.key==='Enter'||event.key===' ')toggleError(this)">
+          <div class="err-header">
+            <div class="err-title">
+              <div class="err-icon" aria-hidden="true">✕</div>
+              Folder Not Found
+            </div>
+            <span class="err-chevron" aria-hidden="true">▼</span>
+          </div>
+          <div class="err-body">
+            <div class="err-code">
+              <span class="t-cmd">$ devtool clean fakefolder</span><br>
+              <span class="t-err">✖ directory not found: 'fakefolder'</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+
+  <!-- ════════════════════════════════════════════════
+       FOOTER
+  ════════════════════════════════════════════════ -->
+  <footer role="contentinfo">
+    <div class="container">
+      <div class="footer-inner">
+
+        <div>
+          <div class="footer-brand">
+            <div class="footer-brand-icon" aria-hidden="true">⚙</div>
+            devtool-cli
+          </div>
+          <p class="footer-desc">
+            A production-quality Go CLI tool for developers who want their terminal to actually help them.
+            Zero cruft, maximum utility.
+          </p>
+        </div>
+
+        <div class="footer-col">
+          <h4>Commands</h4>
+          <ul class="footer-links">
+            <li><a href="#demo">devtool get</a></li>
+            <li><a href="#demo">devtool format</a></li>
+            <li><a href="#demo">devtool clean</a></li>
+            <li><a href="#demo">devtool version</a></li>
+          </ul>
+        </div>
+
+        <div class="footer-col">
+          <h4>Links</h4>
+          <ul class="footer-links">
+            <li><a href="https://github.com/GhanshyamJha05/Devtool-cli" target="_blank" rel="noopener">GitHub</a></li>
+            <li><a href="https://github.com/GhanshyamJha05/Devtool-cli/blob/main/README.md" target="_blank" rel="noopener">README</a></li>
+            <li><a href="https://github.com/GhanshyamJha05/Devtool-cli/issues" target="_blank" rel="noopener">Issues</a></li>
+            <li><a href="https://go.dev/dl/" target="_blank" rel="noopener">Go 1.21+</a></li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="footer-bottom">
+        <span>MIT License — devtool-cli v1.0.0</span>
+        <span>
+          Made with ✏️ and Go by
+          <a href="https://github.com/GhanshyamJha05" target="_blank" rel="noopener">GhanshyamJha05</a>
+        </span>
+      </div>
+    </div>
+  </footer>
+
+
+  <!-- ════════════════════════════════════════════════
+       SCRIPTS
+  ════════════════════════════════════════════════ -->
+  <script>
+    // ── Copy install command ──────────────────────────
+    function copyInstall() {
+      const text = 'go install github.com/GhanshyamJha05/Devtool-cli@latest';
+      navigator.clipboard.writeText(text).catch(() => {
+        // Fallback for older browsers
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      });
+      const fb = document.getElementById('copyFeedback');
+      fb.classList.add('show');
+      setTimeout(() => fb.classList.remove('show'), 2200);
+    }
+
+    // ── Demo tab switcher ─────────────────────────────
+    function switchTab(name, btn) {
+      document.querySelectorAll('.demo-tab').forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      document.querySelectorAll('.demo-content').forEach(c => c.classList.remove('active'));
+
+      btn.classList.add('active');
+      btn.setAttribute('aria-selected', 'true');
+      document.getElementById('demo-' + name).classList.add('active');
+    }
+
+    // ── Error accordion ───────────────────────────────
+    function toggleError(card) {
+      const wasOpen = card.classList.contains('open');
+      document.querySelectorAll('.err-card').forEach(c => {
+        c.classList.remove('open');
+        c.setAttribute('aria-expanded', 'false');
+      });
+      if (!wasOpen) {
+        card.classList.add('open');
+        card.setAttribute('aria-expanded', 'true');
+      }
+    }
+
+    // ── Hamburger menu ────────────────────────────────
+    const hamburger = document.getElementById('hamburger');
+    const mobileNav = document.getElementById('mobileNav');
+
+    hamburger.addEventListener('click', function () {
+      const isOpen = mobileNav.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen);
+    });
+
+    function closeMobileNav() {
+      mobileNav.classList.remove('open');
+      hamburger.classList.remove('open');
+      hamburger.setAttribute('aria-expanded', 'false');
+    }
+
+    // Close mobile nav on outside click
+    document.addEventListener('click', function (e) {
+      if (!document.getElementById('nav').contains(e.target)) {
+        closeMobileNav();
+      }
+    });
+  </script>
+
+</body>
+</html>
