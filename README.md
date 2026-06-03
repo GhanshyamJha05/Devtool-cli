@@ -1,4 +1,4 @@
-# devtool-cli
+# Devtool-cli
 
 A small Go CLI for everyday developer chores.
 
